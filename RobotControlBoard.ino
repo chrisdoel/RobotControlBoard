@@ -1,6 +1,5 @@
 #include <drv8711.h>
 #include <robot_motors.h>
-
 #include <Bluepad32.h>
 #include <cstring>
 
@@ -8,45 +7,56 @@ ControllerPtr myController;
 
 Motors robotMotors;
 
-const bool ALLOW_ANY_CONTROLLER_TO_CONNECT = 1;
+//Set this to either true or false to determine whether any controller can connect
+const bool ALLOW_ANY_CONTROLLER_TO_CONNECT = false;
 
-// uint8_t whitelistedControllerBTAddress[6] = {164, 192, 225, 58, 48, 63};
-uint8_t whitelistedControllerBTAddress[6] = {0, 0, 0, 0, 0, 0};
+//Every controller has a unique bluetooth address, similar to how internet devices have a unique IP address
+//If you want to only allow a particular controller to connect, then add the 6 digit bluetooth address below
+//To find the bluetooth address of the controller: Simply put it in pairing mode, plug in the board and open the serial monitor
+//The controllers bluetooth address will be printed in the serial monitor when it attempts to connect
+// uint8_t whitelistedControllerBTAddress[6] = {0, 0, 0, 0, 0, 0};
+//Example of a whitelisted controller bluetooth address:
+uint8_t whitelistedControllerBTAddress[6] = {28, 160, 184, 87, 59, 170};
 
 
+//This function is called when the controller is connected
 void onConnectedController(ControllerPtr ctl) {
-
-  //If there is not a controller already connected then we try to connect this new controller
+  //If there is not a controller already connected then we try to connect the new controller
   if (myController == nullptr) {
+    //Get the controller properties
     ControllerProperties properties = ctl->getProperties();
     Serial.printf("Controller Bluetooth Address: %i %i %i %i %i %i\nAttempting to connect controller...\n", properties.btaddr[0], properties.btaddr[1], properties.btaddr[2], properties.btaddr[3], properties.btaddr[4], properties.btaddr[5]);
 
-    //Check whether we allow any controllers to connect
+    //This checks whether the connected controller is whitelisted
+    bool isControllerWhitelisted = (std::memcmp(whitelistedControllerBTAddress, properties.btaddr, 6) == 0);
+
+    //Connect the controller if all controllers are allowed OR the controller is whitelisted
     if(ALLOW_ANY_CONTROLLER_TO_CONNECT){
-      Serial.printf("Controller connected\nWARNING: Any controller can connect to this device, set ALLOW_ANY_CONTROLLER_TO_CONNECT to 0 and add a whitelisted controller bluetooth address to ensure only your controller can connect\n");
+      Serial.printf("Controller connected\nWARNING: Any controller can connect to this device, set ALLOW_ANY_CONTROLLER_TO_CONNECT to false and add a whitelisted controller bluetooth address to ensure only your controller can connect\n");
       myController = ctl;
+      //We can set the controller LED colour if this is supported (e.g. PS4, PS5)
+      myController->setColorLED(/*Red*/255, /*Green*/0, /*Blue*/0);
+
+      //We can set the controller players LEDs if this is supported (e.g. Wii controller)
+      myController->setPlayerLEDs(1);
+      
+      //We can also rumble the controller
+      //255 duration is about 2 seconds
+      ctl->setRumble(/*force*/128, /*duration*/128);
     }
-    else{
-      //Check if this new controller's bluetooth address has been whitelisted
-      if(std::memcmp(whitelistedControllerBTAddress, properties.btaddr, 6) == 0){
+    //Check if this new controller's bluetooth address has been whitelisted
+    else if(isControllerWhitelisted){
         Serial.printf("Whitelisted controller connected\n");
         myController = ctl;
-        
-        //We can set the controller LED colour if this is supported (e.g. PS4, PS5)
         myController->setColorLED(/*Red*/255, /*Green*/0, /*Blue*/0);
-
-        //We can set the controller players LEDs if this is supported (e.g. Wii controller)
         myController->setPlayerLEDs(1);
-        
-        //255 duration is about 2 seconds
         ctl->setRumble(/*force*/128, /*duration*/128);
-      }
-      //If it has not been whitelisted, disconnect it
-      else{
-        Serial.printf("This controller has not been whitelisted, disconnecting...\n");
-        Serial.printf("To whitelist this controller, add the following bluetooth address to the whitelistedControllerBTAddress variable: %i %i %i %i %i %i\n", properties.btaddr[0], properties.btaddr[1], properties.btaddr[2], properties.btaddr[3], properties.btaddr[4], properties.btaddr[5]);
-        ctl->disconnect();
-      }
+    }
+    //If it has not been whitelisted, disconnect it
+    else{
+      Serial.printf("This controller has not been whitelisted, disconnecting...\n");
+      Serial.printf("To whitelist this controller, add the following bluetooth address to the whitelistedControllerBTAddress variable: %i %i %i %i %i %i\n", properties.btaddr[0], properties.btaddr[1], properties.btaddr[2], properties.btaddr[3], properties.btaddr[4], properties.btaddr[5]);
+      ctl->disconnect();
     }
   }
   else{
@@ -54,8 +64,8 @@ void onConnectedController(ControllerPtr ctl) {
   }
 }
 
+//This function is called when the controller is disconnected
 void onDisconnectedController(ControllerPtr ctl) {
-  //Disconnect the controller
   if (myController == ctl) {
       Serial.printf("Controller disconnected\n");
       myController = nullptr;
@@ -63,9 +73,12 @@ void onDisconnectedController(ControllerPtr ctl) {
   else{
     Serial.printf("WARNING: Could not disconnect controller\n");
   }
+  BP32.forgetBluetoothKeys();
+
 }
 
-void dumpGamepad(ControllerPtr ctl) {
+//This prints the controller information
+void printController(ControllerPtr ctl) {
     Serial.printf(
         "idx=%d, dpad: 0x%02x, buttons: 0x%04x, axis L: %4d, %4d, axis R: %4d, %4d, brake: %4d, throttle: %4d, "
         "misc: 0x%02x, gyro x:%6d y:%6d z:%6d, accel x:%6d y:%6d z:%6d\n",
@@ -88,86 +101,76 @@ void dumpGamepad(ControllerPtr ctl) {
     );
 }
 
-void processGamepad(ControllerPtr ctl) {
-    float rightScaler = 1.0;
-    float leftScaler = 1.0;
-    int turnAmount = ctl->axisX();
-    int throttle = ctl->axisY();
 
-    throttle = map(throttle, /*Min axis value*/-400, /*Max axis value*/420, 100, -100);
+//This function maps the controller inputs to the motor speeds
+void processControllerInputs(ControllerPtr myController) {
+    int leftThrottle = myController->axisY();
+    int rightThrottle = myController->axisRY();
 
-    turnAmount = map(turnAmount, /*Min axis value*/-400, /*Max axis value*/420, -100, 100);
+    //map the controller input range to the motor speed range (-100.0 to 100.0)
+    leftThrottle = map(leftThrottle, /*Min axis value*/-400, /*Max axis value*/420, -100, 100);
+    rightThrottle = map(rightThrottle, /*Min axis value*/-400, /*Max axis value*/420, -100, 100);
 
-    if(throttle > 50.0 or throttle < -50.0){
-      if(turnAmount < 0){
-        turnAmount = -turnAmount;
-        leftScaler = (100.0 - float(turnAmount))/100.0;
-      }
-      else{
-        rightScaler = (100.0 - float(turnAmount))/100.0;
-      }
-      Serial.printf("left %f right %f\n", rightScaler, leftScaler);
-      robotMotors.setMotorSpeed(LEFT_MOTOR, -throttle*leftScaler);
-      robotMotors.setMotorSpeed(RIGHT_MOTOR, -throttle*rightScaler);
-    }
-    else{
-      robotMotors.setMotorSpeed(LEFT_MOTOR, -turnAmount);
-      robotMotors.setMotorSpeed(RIGHT_MOTOR, turnAmount);
-    }
-    // Another way to query controller data is by getting the buttons() function.
-    // See how the different "dump*" functions dump the Controller info.
-    dumpGamepad(ctl);
+    robotMotors.setMotorSpeed(LEFT_MOTOR, leftThrottle);
+    robotMotors.setMotorSpeed(RIGHT_MOTOR, rightThrottle);
+
+    printController(myController);
 }
 
-// Arduino setup function. Runs in CPU 1
 void setup() {
+    //This sets up the serial monitor
+    //Set the Arduino serial monitor to 115200 baud in order to see the print statements
     Serial.begin(115200);
+
     Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
+
     const uint8_t* addr = BP32.localBdAddress();
     Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
-    // Setup the Bluepad32 callbacks
+    //Setup the functions that are called when a controller conencts or disconnects
     BP32.setup(&onConnectedController, &onDisconnectedController);
 
-    // "forgetBluetoothKeys()" should be called when the user performs
-    // a "device factory reset", or similar.
-    // Calling "forgetBluetoothKeys" in setup() just as an example.
-    // Forgetting Bluetooth keys prevents "paired" gamepads to reconnect.
-    // But might also fix some connection / re-connection issues.
+    //This forgets paired bluetooth devices
+    //Feel free to remove this line if you want it to auto connect your last controller
+    //However this can sometimes cause connection issues
     BP32.forgetBluetoothKeys();
 
-    // Enables mouse / touchpad support for gamepads that support them.
-    // When enabled controllers like DualSense and DualShock4 generate two connected devices:
-    // - First one: the gamepad
-    // - Second one, which is a "vritual device", is a mouse
-    // By default it is disabled.
+    //This tells the gamepad library that we dont want the controller to be registered as a mouse
+    //The gamepad library supports 'virtual devices' such as mice, but we have no need for this
     BP32.enableVirtualDevice(false);
 
     robotMotors.init();
-    robotMotors.setCurrentLimit(20.0);
+    robotMotors.setCurrentLimit(40.0);
     robotMotors.setMotorBrakeMode(AUTO_BRAKE);
 }
 
 void loop() {
     //This needs to be called during every loop
+    //It handles all the gamepad functions
     BP32.update();
 
+    //This if statement handles bluetooth controller inputs
+    //It checks if the controller is connected and maps controller inputs to motor speeds
     if (myController && myController->isConnected()) {
         if (myController->isGamepad()) {
-            processGamepad(myController);
+            //Map controller inputs to motor speeds
+            processControllerInputs(myController);
         }
         else {
             Serial.printf("Data not available yet\n");
         }
-        // See ArduinoController.h for all the available functions.
     }
     else{
+      //If a controller is not connected then we set the motor speeds to 0
       robotMotors.setMotorSpeed(LEFT_MOTOR, 0);
       robotMotors.setMotorSpeed(RIGHT_MOTOR, 0);
     }
 
     //This checks for any motor controller faults
-    //If any are detected it will try to clear the faults
+    //If any are detected it will print the error and try to automatically clear the faults
     robotMotors.checkFaults();
+
+    //We add a delay of 30 milliseconds for each loop
+    //This means that the loop will run aproximately 30 times per second
     delay(30);
 }
