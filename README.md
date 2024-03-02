@@ -19,6 +19,7 @@ Safety warning
 - If you wish to plug in your laptop while powering the control board from a battery or PSU, I recommend de-soldering D9 to ensure that your laptop has additional isolation from the board
 
 ## PCB overview
+![image](https://github.com/chrisdoel/RobotControlBoard/assets/70950249/63dbf7ff-a471-4055-8c4e-d58655e2e8d9)
 
 ## Setting up the hardware
 You will likely have recieved a PCB with no fuses or connectors soldered. Here are the steps to get the board fully constructed and ready to be programmed.
