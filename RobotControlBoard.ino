@@ -3,20 +3,22 @@
 #include <Bluepad32.h>
 #include <cstring>
 
+#define LED_PIN 2
+
 ControllerPtr myController;
 
 Motors robotMotors;
 
 //Set this to either true or false to determine whether any controller can connect
-const bool ALLOW_ANY_CONTROLLER_TO_CONNECT = false;
+const bool ALLOW_ANY_CONTROLLER_TO_CONNECT = true;
 
 //Every controller has a unique bluetooth address, similar to how internet devices have a unique IP address
 //If you want to only allow a particular controller to connect, then add the 6 digit bluetooth address below
 //To find the bluetooth address of the controller: Simply put it in pairing mode, plug in the board and open the serial monitor
 //The controllers bluetooth address will be printed in the serial monitor when it attempts to connect
-// uint8_t whitelistedControllerBTAddress[6] = {0, 0, 0, 0, 0, 0};
+uint8_t whitelistedControllerBTAddress[6] = {0, 0, 0, 0, 0, 0};
 //Example of a whitelisted controller bluetooth address:
-uint8_t whitelistedControllerBTAddress[6] = {28, 160, 184, 87, 59, 170};
+// uint8_t whitelistedControllerBTAddress[6] = {28, 160, 184, 87, 59, 170};
 
 
 //This function is called when the controller is connected
@@ -140,8 +142,8 @@ void setup() {
     BP32.enableVirtualDevice(false);
 
     robotMotors.init();
-    robotMotors.setCurrentLimit(40.0);
-    robotMotors.setMotorBrakeMode(AUTO_BRAKE);
+    robotMotors.setCurrentLimit(10.0);
+    pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
@@ -169,6 +171,9 @@ void loop() {
     //This checks for any motor controller faults
     //If any are detected it will print the error and try to automatically clear the faults
     robotMotors.checkFaults();
+
+    //This toggles the LED every loop
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 
     //We add a delay of 30 milliseconds for each loop
     //This means that the loop will run aproximately 30 times per second

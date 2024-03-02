@@ -419,7 +419,7 @@ void DRV8711::configureDefaultBrushedMotorProfile(){
   //This basically prevents any overcurrent faults occurring within 1us of the switching time
   //Therefore avoiding instantaneous peaks from causing an overcurrent fault
   //128*20 nS + 1 uS = 3.5 uS
-  setBlankingTime(128);
+  setBlankingTime(255);
   
   //Lets set the gate drive current to the maximum
   //This will need validating to ensure the rise times
@@ -438,34 +438,41 @@ void DRV8711::configureDefaultBrushedMotorProfile(){
   //due to the 7.5 mOhm internal resistance
   //This is sensed by the chip and will throw an overcurrent fault 
   setOverCurrentProtectionThreshold(mV_250);
-  setOverCurrentDeglitch(us_4);
+  setOverCurrentDeglitch(us_8);
 
   //We are using brushed motor so we tell the DRV8711
   //to listen to the direct PWM inputs
   setPWMMode(BRUSHED);
 
   setCurrentLimit(10);
+  setTOFF(200);
 
   setMotorEnabled(true);
 }
 
 void DRV8711::setCurrentLimit(uint8_t amps){
-  if(amps > 20){
-    Serial.printf("Error, requested current limit too high\n");
-    Serial.printf("Modify the DRV8711::setCurrentLimit function if you really want it this high\n");
-    Serial.printf("Do so at your own risk\n");
+
+
+  //I have no idea why i need the following settings for the current limit work
+  //It should be CurrentLimit = 2.75 * torqueValue / 256 * GAIN * CURRENT_SHUNT_RESISTANCE
+  //But as you can see below I am having to offset the current by 4 amps
+  //And I am also setting the drv8711 to a gain of 5, when i am using 20 in my equation
+  //Anyway, it has been validated experimentally from 0.5 amps to 10A in increments of 0.5A
+  //So i guess it just works
+  setSenseAmplifierGain(GAIN5);
+
+  float torqueValue = (float(amps + 4.0f) * (256.0f * 20.0 * CURRENT_SHUNT_RESISTANCE))/2.75f;
+
+  if(torqueValue > 255.0){
+    Serial.printf("Error, requested current limit too high: %f\n", torqueValue);
+    // Serial.printf("Modify the DRV8711::setCurrentLimit function if you really want it this high\n");
+    // Serial.printf("Do so at your own risk\n");
     return;
   }
-
-  //Set the sense amplifier gain to 10x
-  //We could set this higher but we risk noise triggering OCP
-  //This should give us a resolution of about 0.43 A
-  setSenseAmplifierGain(GAIN40);
-
-  float torqueValue = (float(amps) * (256.0f * 40.0 * CURRENT_SHUNT_RESISTANCE))/2.75f;
+  else{
+    setTorque(uint8_t(torqueValue));
+  }
   Serial.printf("Setting torque to %i\n", uint8_t(torqueValue));
-
-  setTorque(uint8_t(torqueValue));
 }
 
 

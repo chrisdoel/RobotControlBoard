@@ -58,14 +58,14 @@ void Motors::setMotorForwardSpeed(MOTOR leftOrRightMotor, float speed){
   speed = validateSpeed(speed);
 
   if(leftOrRightMotor == RIGHT_MOTOR){
-    Serial.printf("Setting right motor pwm to %f\n", speed);
+    // Serial.printf("Setting right motor pwm to %f\n", speed);
 
     mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B);
     mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, speed);
     mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A, MCPWM_DUTY_MODE_0);
   }
   else{
-    Serial.printf("Setting left motor pwm to %f\n", speed);
+    // Serial.printf("Setting left motor pwm to %f\n", speed);
 
     mcpwm_set_signal_low(MCPWM_UNIT_1, MCPWM_TIMER_1, MCPWM_OPR_B);
     mcpwm_set_duty(MCPWM_UNIT_1, MCPWM_TIMER_1, MCPWM_OPR_A, speed);
@@ -79,14 +79,14 @@ void Motors::setMotorBackwardSpeed(MOTOR leftOrRightMotor, float speed){
   //Convert the negative speed to a positive speed
   speed = -speed;
   if(leftOrRightMotor == RIGHT_MOTOR){
-    Serial.printf("Setting right motor pwm to reverse %f\n", speed);
+    // Serial.printf("Setting right motor pwm to reverse %f\n", speed);
 
     mcpwm_set_signal_low(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_A);
     mcpwm_set_duty(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, speed);
     mcpwm_set_duty_type(MCPWM_UNIT_0, MCPWM_TIMER_0, MCPWM_OPR_B, MCPWM_DUTY_MODE_0);
   }
   else{
-    Serial.printf("Setting left motor pwm to reverse %f\n", speed);
+    // Serial.printf("Setting left motor pwm to reverse %f\n", speed);
 
     mcpwm_set_signal_low(MCPWM_UNIT_1, MCPWM_TIMER_1, MCPWM_OPR_A);
     mcpwm_set_duty(MCPWM_UNIT_1, MCPWM_TIMER_1, MCPWM_OPR_B, speed);
@@ -104,7 +104,7 @@ void Motors::setMotorBrakeMode(BRAKE_MODE brakeMode){
 }
 
 float Motors::validateCurrent(float current){
-  if(current > 100.0f){
+  if(current > 20.0f){
     Serial.println("Warning: Current limit >20 A provided, defaulting to 20 A");
     current = 20.0f;
   }
