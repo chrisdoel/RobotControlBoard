@@ -52,6 +52,7 @@ The input power connector size is a standard XT60
 
 
 ### Beefing up the power traces
+ONLY DO THIS IF IT IS 100% NECESSARY - If done incorrectly, excess heat on the board can damage the MOSFETs.
 The PCB traces use a 1oz copper thickness, which means that it can handle 10A continuously. However, if you require more current than this, i would massively recommend adding a bunch of solder over all exposed power traces to thicken them up.
 Set the soldering iron to about 400 degrees and spread a layer of solder over the traces, try to be relatively quick to prevent overheating components on the board.
 
